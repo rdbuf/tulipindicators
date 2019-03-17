@@ -46,8 +46,8 @@ void compare_arrays(TI_REAL *a, TI_REAL *b, int size_a, int size_b) {
 
 /*Return next non-comment, non-blank line.*/
 char *next_line(FILE *fp) {
-    static char buf[1024];
-    while (fgets(buf, 1024, fp)) {
+    static char buf[65536];
+    while (fgets(buf, 65536, fp)) {
         /*Skip Comments*/
         if (buf[0] == '#') continue;
 
