@@ -58,7 +58,7 @@ header = "/* \n\
 \#include \"../indicators.h\""
 
 genStub (Indicator (_, abbrev) inputs options constraints outLen outputs) = let
-    start = joinlines [signature "int" ("ti_" <> abbrev <> "_start") ["TI_REAL const *options"]] $ body [statement $ "return " <> outLen]
+    start = joinlines [signature "int" ("ti_" <> abbrev <> "_start") ["TI_REAL const *options"]] $ body (opts <> [statement $ "return " <> outLen])
     sig = [signature "int" ("ti_" <> abbrev) ["int size", "TI_REAL const *const *inputs", "TI_REAL const *options", "TI_REAL *const *outputs"]]
     unpack source type_ idx name = statement $ assign (type_ <> name) (at source (show idx))
     opts = zipWith (unpack "options" "const TI_REAL ") [0..] options

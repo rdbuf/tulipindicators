@@ -26,7 +26,7 @@
 /*
  *
  * Version 0.8.4
- * Header Build 1537377628
+ * Header Build 1553178882
  *
  */
 
@@ -48,13 +48,14 @@ long int ti_build() {return TI_BUILD;}
 
 
 struct ti_indicator_info ti_indicators[] = {
+    {"abands", "Acceleration Bands", ti_abands_start, ti_abands, TI_TYPE_INDICATOR, 3, 2, 3, {"high","low","real",0}, {"period","factor",0}, {"upper_band","lower_band","basis",0}},
     {"abs", "Vector Absolute Value", ti_abs_start, ti_abs, TI_TYPE_SIMPLE, 1, 0, 1, {"real",0}, {"",0}, {"abs",0}},
     {"acos", "Vector Arccosine", ti_acos_start, ti_acos, TI_TYPE_SIMPLE, 1, 0, 1, {"real",0}, {"",0}, {"acos",0}},
     {"ad", "Accumulation/Distribution Line", ti_ad_start, ti_ad, TI_TYPE_INDICATOR, 4, 0, 1, {"high","low","close","volume",0}, {"",0}, {"ad",0}},
     {"add", "Vector Addition", ti_add_start, ti_add, TI_TYPE_SIMPLE, 2, 0, 1, {"real","real",0}, {"",0}, {"add",0}},
     {"adosc", "Accumulation/Distribution Oscillator", ti_adosc_start, ti_adosc, TI_TYPE_INDICATOR, 4, 2, 1, {"high","low","close","volume",0}, {"short period","long period",0}, {"adosc",0}},
-    {"adx", "Average Directional Movement Index", ti_adx_start, ti_adx, TI_TYPE_INDICATOR, 3, 1, 1, {"high","low","close",0}, {"period",0}, {"dx",0}},
-    {"adxr", "Average Directional Movement Rating", ti_adxr_start, ti_adxr, TI_TYPE_INDICATOR, 3, 1, 1, {"high","low","close",0}, {"period",0}, {"dx",0}},
+    {"adx", "Average Directional Movement Index", ti_adx_start, ti_adx, TI_TYPE_INDICATOR, 3, 1, 1, {"high","low","close",0}, {"period",0}, {"adx",0}},
+    {"adxr", "Average Directional Movement Rating", ti_adxr_start, ti_adxr, TI_TYPE_INDICATOR, 3, 1, 1, {"high","low","close",0}, {"period",0}, {"adxr",0}},
     {"ao", "Awesome Oscillator", ti_ao_start, ti_ao, TI_TYPE_INDICATOR, 2, 0, 1, {"high","low",0}, {"",0}, {"ao",0}},
     {"apo", "Absolute Price Oscillator", ti_apo_start, ti_apo, TI_TYPE_INDICATOR, 1, 2, 1, {"real",0}, {"short period","long period",0}, {"apo",0}},
     {"aroon", "Aroon", ti_aroon_start, ti_aroon, TI_TYPE_INDICATOR, 2, 1, 2, {"high","low",0}, {"period",0}, {"aroon_down","aroon_up",0}},
