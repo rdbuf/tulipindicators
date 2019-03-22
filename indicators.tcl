@@ -64,7 +64,6 @@ set indicators {}
 #type name func_name inputs options outputs
 
 #Moving averages
-lappend indicators [list overlay "Double Exponential Moving Average" dema 1 1 1 {real} {period} {dema}]
 lappend indicators [list overlay "Exponential Moving Average" ema 1 1 1 {real} {period} {ema}]
 lappend indicators [list overlay "Hull Moving Average" hma 1 1 1 {real} {period} {hma}]
 lappend indicators [list overlay "Simple Moving Average" sma 1 1 1 {real} {period} {sma}]
@@ -250,10 +249,7 @@ long int ti_build();
 "
 
       set fun_args_start {TI_REAL const *options}
-      set fun_args "int size,
-      TI_REAL const *const *inputs,
-      TI_REAL const *options,
-      TI_REAL *const *outputs"
+      set fun_args "int size, TI_REAL const *const *inputs, TI_REAL const *options, TI_REAL *const *outputs"
 
       puts $h "
 
@@ -344,14 +340,26 @@ foreach func $indicators {
         set o [open $imp w]
         puts $o $license
         puts $o {#include "../indicators.h"}
-        puts $o "\n\n"
+        puts $o "\n"
 
         puts $o "$start {"
         puts $o ""
         puts $o "}\n\n"
 
         puts $o "$fun {"
-        puts $o ""
+        set indent "    "
+        for {set i 0} {$i < $in} {incr i} {
+            puts $o "${indent}TI_REAL const *[lindex $in_names $i] = inputs\[$i\];"
+        }
+        for {set i 0} {$i < $opt} {incr i} {
+            puts $o "${indent}const TI_REAL [lindex $opt_names $i] = options\[$i\];"
+        }
+        for {set i 0} {$i < $out} {incr i} {
+            puts $o "${indent}TI_REAL *[lindex $out_names $i] = outputs\[$i\];"
+        }
+
+        puts $o "\n${indent}#error \"CODE GOES HERE\"\n"
+        puts $o "${indent}return TI_OKAY;"
         puts $o "}"
 
         close $o
