@@ -66,7 +66,7 @@ foreach testcase $testcases {
     puts $o "${indent}printf(\"running testcase $name...\\n\");"
     puts $o "${indent}ti_$name\(size, inputs, options, outputs\);"
 
-    puts $o "${indent}bool ok;"
+    puts $o "${indent}bool ok, any_failed = false;"
     for {set i 0} {$i < [llength $outputs]} {incr i} {
         puts $o "
     ok = true;
@@ -74,6 +74,7 @@ foreach testcase $testcases {
         ok = ok && (fabs(output_$i\[i\] - expected_output_$i\[i\]) < 0.0001);
     }
     if (!ok) {
+        any_failed = true;
         printf(\"output #%s mismatch: \\n\", info->output_names\[$i\]);
         printf(\"actual \{\\n    \");
         for (int i = 0; i < out_size; ++i) {
@@ -85,6 +86,7 @@ foreach testcase $testcases {
         }
         printf(\"\\n\}\\n\");
     }
+    return !any_failed;
         "
     }
     puts $o "}"
