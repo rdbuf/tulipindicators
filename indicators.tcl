@@ -470,3 +470,6 @@ const ti_indicator_info *ti_find_indicator(const char *name) {
 
 
 close $idx
+
+
+source testcases.tcl
