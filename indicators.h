@@ -25,7 +25,7 @@
 /*
  *
  * Version 0.8.4
- * Header Build 1537377628
+ * Header Build 1553178882
  *
  */
 
@@ -40,7 +40,7 @@
 
 
 #define TI_VERSION "0.8.4"
-#define TI_BUILD 1537377628
+#define TI_BUILD 1553178882
 
 
 #ifndef TI_SKIP_SYSTEM_HEADERS
@@ -64,7 +64,7 @@ long int ti_build();
 
 #define TI_REAL double
 
-#define TI_INDICATOR_COUNT 104 /* Total number of indicators. */
+#define TI_INDICATOR_COUNT 105 /* Total number of indicators. */
 
 #define TI_OKAY                    0
 #define TI_INVALID_OPTION          1
@@ -124,6 +124,22 @@ const ti_indicator_info *ti_find_indicator(const char *name);
 
 
 
+
+
+
+
+
+/* Acceleration Bands */
+/* Type: indicator */
+/* Input arrays: 3    Options: 2    Output arrays: 3 */
+/* Inputs: high, low, real */
+/* Options: period, factor */
+/* Outputs: upper_band, lower_band, basis */
+int ti_abands_start(TI_REAL const *options);
+int ti_abands(int size,
+      TI_REAL const *const *inputs,
+      TI_REAL const *options,
+      TI_REAL *const *outputs);
 
 
 
@@ -214,7 +230,7 @@ int ti_adosc(int size,
 /* Input arrays: 3    Options: 1    Output arrays: 1 */
 /* Inputs: high, low, close */
 /* Options: period */
-/* Outputs: dx */
+/* Outputs: adx */
 int ti_adx_start(TI_REAL const *options);
 int ti_adx(int size,
       TI_REAL const *const *inputs,
@@ -230,7 +246,7 @@ int ti_adx(int size,
 /* Input arrays: 3    Options: 1    Output arrays: 1 */
 /* Inputs: high, low, close */
 /* Options: period */
-/* Outputs: dx */
+/* Outputs: adxr */
 int ti_adxr_start(TI_REAL const *options);
 int ti_adxr(int size,
       TI_REAL const *const *inputs,

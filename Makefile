@@ -10,10 +10,18 @@ SRCS=$(wildcard indicators/*.c)
 SRCS+=$(wildcard utils/*.c)
 OBJS=$(SRCS:%.c=%.o)
 AMAL=$(SRCS:%.c=%.ca)
+TSRCS=$(wildcard tests/*.c)
+TSTS=$(TSRCS:%.c=%)
 
 .SUFFIXES: .c .o .h .ca
 
-all: libindicators.a sample example1 example2 fuzzer smoke
+all: libindicators.a sample example1 example2 fuzzer smoke tests
+
+tests: libindicators.a $(TSTS)
+
+tests/%: tests/%.c libindicators.a
+	$(CC) $(CCFLAGS) -o $@ $^ -lm
+	./$@
 
 libindicators.a: indicators_index.o $(OBJS)
 	$(AR) rcu $@ $^
