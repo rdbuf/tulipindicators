@@ -96,7 +96,7 @@ void print_array(TI_REAL *a, int size) {
 
 /*********** PARSING, TESTING, REPORTING ************/
 
-void run_one(FILE *fp) {
+void run_one(FILE *fp, const char* target_name) {
     char *line = read_line(fp);
     if (!line) { return; }
     if (line[0] < 'a' || line[0] > 'z') {
@@ -104,7 +104,8 @@ void run_one(FILE *fp) {
         exit(PARSING_ERROR);
     }
     char *name = strtok(line, " \n\r");
-    printf("running \t%-16s... ", name);
+    int skip_this = target_name && strcmp(name, target_name) != 0;
+    if (!skip_this) { printf("running \t%-16s... ", name); }
 
     int any_failures_here = 0;
 
@@ -149,6 +150,8 @@ void run_one(FILE *fp) {
         answer_size = read_array(fp, answers[i]);
     }
 
+    if (skip_this) { goto cleanup; }
+
     const clock_t ts_start = clock();
     const int ret = info->indicator(input_size, (const double * const*)inputs, options, outputs);
     const clock_t ts_end = clock();
@@ -176,12 +179,12 @@ cleanup:
     for (i = 0; i < info->inputs; ++i) { if (inputs[i]) { free(inputs[i]); } };
     for (i = 0; i < info->outputs; ++i) { if (answers[i]) { free(answers[i]); } };
     for (i = 0; i < info->outputs; ++i) { if (outputs[i]) { free(outputs[i]); } };
-    if (!any_failures_here) {
+    if (!any_failures_here && !skip_this) {
         printf("%4dμs\n", (int)((ts_end - ts_start) / (double)CLOCKS_PER_SEC * 1000000.0));
     }
 }
 
-void run_tests(const char *fname) {
+void run_tests(const char *fname, const char* target_name) {
     printf("# test suite %s:\n", fname);
     FILE *fp = fopen(fname, "r");
     if (!fp) {
@@ -190,7 +193,7 @@ void run_tests(const char *fname) {
     }
 
     while (!feof(fp)) {
-        run_one(fp);
+        run_one(fp, target_name);
     }
 
     printf("\n");
@@ -216,7 +219,7 @@ void test_buffer() {
     ti_buffer_free(b);
 }
 
-int main() {
+int main(int argc, const char** argv) {
     if (strcmp(TI_VERSION, ti_version()) != 0) {
         printf("library version mismatch: header %s, binary %s\n", TI_VERSION, ti_version());
         exit(VERSION_MISMATCH);
@@ -226,9 +229,11 @@ int main() {
         exit(VERSION_MISMATCH);
     }
 
-    run_tests("tests/untest.txt");
-    run_tests("tests/atoz.txt");
-    run_tests("tests/extra.txt");
+    const char* target_name = argc > 1 ? argv[1] : 0;
+
+    run_tests("tests/untest.txt", target_name);
+    run_tests("tests/atoz.txt", target_name);
+    run_tests("tests/extra.txt", target_name);
 
     int i;
     for (i = 0; i < TI_INDICATOR_COUNT; ++i) {
