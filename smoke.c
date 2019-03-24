@@ -77,7 +77,7 @@ int equal_reals(TI_REAL a, TI_REAL b) {
     return fabs(a - b) < 0.001;
 }
 
-int equal_arrays(TI_REAL *a, TI_REAL *b, int size_a, int size_b) {
+int equal_arrays(const TI_REAL *a, const TI_REAL *b, int size_a, int size_b) {
     if (size_a != size_b) { return 0; }
 
     int i;
@@ -87,7 +87,7 @@ int equal_arrays(TI_REAL *a, TI_REAL *b, int size_a, int size_b) {
     return 1;
 }
 
-void print_array(TI_REAL *a, int size) {
+void print_array(const TI_REAL *a, int size) {
     printf("[%i] = {", size);
     for (int i = 0; i < size-1; ++i) {
         printf("%.3f,", a[i]);
@@ -127,7 +127,7 @@ void run_one(FILE *fp, const char* target_name) {
     while ((s = strtok(0, " \n\r"))) { *o++ = atof(s); }
 
     if (o-options != info->options) {
-        printf("options number mismatch: expected %lli, got %lli\n", o-options, info->options);
+        printf("options number mismatch: expected %i, got %i\n", (int)(o-options), info->options);
         failed_cnt += 1;
         any_failures_here = 1;
         goto cleanup;
@@ -202,7 +202,7 @@ void run_tests(const char *fname, const char* target_name) {
     fclose(fp);
 }
 
-int test_buffer() {
+void test_buffer() {
     printf("running \t%-16s... ", "buffer");
     #define buffer_size 3
     ti_buffer *b = ti_buffer_new(buffer_size);
@@ -214,7 +214,7 @@ int test_buffer() {
     TI_REAL answers_sum[input_size] = {0};
 
     clock_t ts_start = clock();
-    for (int i = 0; i < input_size; ++i) {
+    for (int i = 0; i < (int)(input_size); ++i) {
         ti_buffer_push(b, input[i]);
         answers_sum[i] = b->sum;
     }
@@ -250,7 +250,7 @@ int main(int argc, const char** argv) {
         exit(VERSION_MISMATCH);
     }
     if (TI_BUILD != ti_build()) {
-        printf("build version mismatch: header %i, binary %i\n", TI_BUILD, ti_build());
+        printf("build version mismatch: header %i, binary %li\n", TI_BUILD, ti_build());
         exit(VERSION_MISMATCH);
     }
 
