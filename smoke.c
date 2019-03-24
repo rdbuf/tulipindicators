@@ -21,11 +21,13 @@
  *
  */
 
-#include "utils/minctest.h"
+//#include "utils/minctest.h"
 #include "indicators.h"
 #include "utils/buffer.h"
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <time.h>
 
 /*********** TYPEDEFS ************/
 
@@ -200,23 +202,46 @@ void run_tests(const char *fname, const char* target_name) {
     fclose(fp);
 }
 
-void test_buffer() {
-    ti_buffer *b = ti_buffer_new(3);
-    ti_buffer_push(b, 5.0); lfequal(b->sum, 5.0);
-    ti_buffer_push(b, 5.0); lfequal(b->sum, 10.0);
-    ti_buffer_push(b, 1.0); lfequal(b->sum, 11.0);
-    ti_buffer_push(b, 1.0); lfequal(b->sum, 7.0);
-    ti_buffer_push(b, 3.0); lfequal(b->sum, 5.0);
-    ti_buffer_push(b, 1.0); lfequal(b->sum, 5.0);
-    ti_buffer_push(b, 2.0); lfequal(b->sum, 6.0);
-    ti_buffer_push(b, 3.0); lfequal(b->sum, 6.0);
+int test_buffer() {
+    printf("running \t%-16s... ", "buffer");
+    #define buffer_size 3
+    ti_buffer *b = ti_buffer_new(buffer_size);
+    const TI_REAL input[] = {5,5,1,1,3,1,2,3};
+    const TI_REAL sum[] = {5,10,11,7,5,5,6,6};
+    const TI_REAL output[] = {1,2,3};
 
-    lfequal(ti_buffer_get(b, 0), 3.0);
-    lfequal(ti_buffer_get(b, -1), 2.0);
-    lfequal(ti_buffer_get(b, -2), 1.0);
-    lfequal(ti_buffer_get(b, -3), 3.0);
+    #define input_size sizeof(input)/sizeof(input[0])
+    TI_REAL answers_sum[input_size] = {0};
+
+    clock_t ts_start = clock();
+    for (int i = 0; i < input_size; ++i) {
+        ti_buffer_push(b, input[i]);
+        answers_sum[i] = b->sum;
+    }
+
+    TI_REAL answers_output[buffer_size] = {0};
+    for (int i = 0; i < buffer_size; ++i) {
+        answers_output[i] = ti_buffer_get(b, i-buffer_size+1);
+    }
+    TI_REAL ts_end = clock();
+
+    int any_failures_here = 0;
+    if (!equal_arrays(output, answers_output, buffer_size, buffer_size)) {
+        printf("output mismatch: \n");
+        printf("> expected: "); print_array(output, buffer_size); printf("\n");
+        printf("> got:      "); print_array(answers_output, buffer_size); printf("\n");
+        any_failures_here = 1;
+    }
+    if (!equal_arrays(sum, answers_sum, input_size, input_size)) {
+        printf("sum mismatch: \n");
+        printf("> expected: "); print_array(sum, input_size); printf("\n");
+        printf("> got:      "); print_array(answers_sum, input_size); printf("\n");
+        any_failures_here = 1;
+    }
 
     ti_buffer_free(b);
+    if (any_failures_here) { exit(FAILURES_OCCURED); }
+    printf("%4dμs\n", (int)((ts_end - ts_start) / (double)CLOCKS_PER_SEC * 1000000.0));
 }
 
 int main(int argc, const char** argv) {
@@ -225,9 +250,13 @@ int main(int argc, const char** argv) {
         exit(VERSION_MISMATCH);
     }
     if (TI_BUILD != ti_build()) {
-        printf("build version mismatch, header %i, binary %i\n", TI_BUILD, ti_build());
+        printf("build version mismatch: header %i, binary %i\n", TI_BUILD, ti_build());
         exit(VERSION_MISMATCH);
     }
+
+    printf("# utils:\n");
+    test_buffer();
+    printf("\n");
 
     const char* target_name = argc > 1 ? argv[1] : 0;
 
