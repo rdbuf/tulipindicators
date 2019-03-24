@@ -27,94 +27,108 @@
 #include <string.h>
 #include <stdlib.h>
 
+/*********** TYPEDEFS ************/
+
+enum {OK, FAILURES_OCCURED, PARSING_ERROR, VERSION_MISMATCH};
+
+/*********** GLOBALS ************/
+
 int tested[TI_INDICATOR_COUNT] = {0};
+int failed_cnt = 0;
 
-/* Compare two arrays, assert each element is equal. */
-void compare_arrays(TI_REAL *a, TI_REAL *b, int size_a, int size_b) {
-    int i;
+/************ PARSING PRIMITIVES *************/
 
-    lequal(size_a, size_b);
-    if (size_a != size_b) {
-        printf("Size mismatch.\n");
-    }
-
-    for (i = 0; i < size_a; ++i) {
-        lfequal(a[i], b[i]);
-    }
-}
-
-
-/*Return next non-comment, non-blank line.*/
-char *next_line(FILE *fp) {
+char *read_line(FILE *fp) {
     static char buf[65536];
     while (fgets(buf, 65536, fp)) {
-        /*Skip Comments*/
-        if (buf[0] == '#') continue;
-
-        /*Skip blank lines*/
-        if (buf[0] == 10 || buf[0] == 13) continue;
-
+        if (buf[0] == '#' || buf[0] == '\n' || buf[0] == '\r') { continue; }
         return buf;
     }
-
     return 0;
 }
 
-
-/*Read in float array.*/
-int get_array(FILE *fp, TI_REAL *s) {
-    char *line = next_line(fp);
-
-    if (line[0] != '{') {
-        printf("Bad input\n");
-        lok(0);
-        return 0;
+int read_array(FILE *fp, TI_REAL *s) {
+    char *line = read_line(fp);
+    if (!line) {
+        printf("seems like an unexpected eof\n");
+        exit(PARSING_ERROR);
     }
 
-//#pragma warning(disable:4996) //MSVC
-    char *num = strtok(line+1, ",}\r\n");
-
-    if (!num) {
-        return 0;
+    if (line[0] != '{') {
+        printf("bad input: expected array, got '%s'\n", line);
+        exit(PARSING_ERROR);
     }
 
     TI_REAL *inp = s;
-
-    do {
-        *inp = atof(num);
-        ++inp;
-    } while ((num = strtok(0, ",}\r\n")));
+    char *num = strtok(&line[1], ",}\r\n");
+    while (num) {
+        *inp++ = atof(num);
+        num = strtok(0, ",}\r\n");
+    }
 
     return (int)(inp - s);
 }
 
-/*Read in options, inputs, answers, and test.*/
-void test_ind_name(FILE *fp, const char *name, int count) {
+/*********** UTILITIES *************/
 
-    /*Find indicator from name.*/
+int equal_reals(TI_REAL a, TI_REAL b) {
+    return fabs(a - b) < 0.001;
+}
+
+int equal_arrays(TI_REAL *a, TI_REAL *b, int size_a, int size_b) {
+    if (size_a != size_b) { return 0; }
+
+    int i;
+    for (i = 0; i < size_a; ++i) {
+        if (!equal_reals(a[i], b[i])) { return 0; };
+    }
+    return 1;
+}
+
+void print_array(TI_REAL *a, int size) {
+    printf("[%i] = {", size);
+    for (int i = 0; i < size-1; ++i) {
+        printf("%.3f,", a[i]);
+    }
+    if (size) { printf("%.3f", a[size-1]); }
+    printf("}");
+}
+
+/*********** PARSING, TESTING, REPORTING ************/
+
+void run_one(FILE *fp) {
+    char *line = read_line(fp);
+    if (!line) { return; }
+    if (line[0] < 'a' || line[0] > 'z') {
+        printf("expected indicator name, got %s\n", line);
+        exit(PARSING_ERROR);
+    }
+    char *name = strtok(line, " \n\r");
+    printf("running \t%-16s... ", name);
+
+    int any_failures_here = 0;
+
     const ti_indicator_info *info = ti_find_indicator(name);
-
     if (!info) {
-        printf("Couldn't find indicator %s\n", name);
-        lok(0);
-        return;
+        printf("unknown indicator %s\n", name);
+        failed_cnt += 1;
+        any_failures_here = 1;
+        goto cleanup;
     }
 
-
-    const int ind_num = (int)(info - ti_indicators);
-    if (count)
-        tested[ind_num] = 1;
-
+    tested[(int)(info - ti_indicators)] = 1;
 
     TI_REAL options[TI_MAXINDPARAMS];
     TI_REAL *o = options;
     const char *s;
-    while((s = strtok(0, " \n\r"))) {
-        *o = atof(s);
-        ++o;
-    }
+    while ((s = strtok(0, " \n\r"))) { *o++ = atof(s); }
 
-    lequal((int)(o-options), info->options);
+    if (o-options != info->options) {
+        printf("options number mismatch: expected %lli, got %lli\n", o-options, info->options);
+        failed_cnt += 1;
+        any_failures_here = 1;
+        goto cleanup;
+    }
 
     int i;
 
@@ -124,66 +138,64 @@ void test_ind_name(FILE *fp, const char *name, int count) {
 
     int input_size = 0;
     for (i = 0; i < info->inputs; ++i) {
-        inputs[i] = malloc(sizeof(TI_REAL) * 512);
-        input_size = get_array(fp, inputs[i]);
+        inputs[i] = malloc(sizeof(TI_REAL) * 4096);
+        input_size = read_array(fp, inputs[i]);
     }
 
     int answer_size = 0;
     for (i = 0; i < info->outputs; ++i) {
-        answers[i] = malloc(sizeof(TI_REAL) * 512);
-        outputs[i] = malloc(sizeof(TI_REAL) * 512);
-        answer_size = get_array(fp, answers[i]);
+        answers[i] = malloc(sizeof(TI_REAL) * 4096);
+        outputs[i] = malloc(sizeof(TI_REAL) * 4096);
+        answer_size = read_array(fp, answers[i]);
     }
 
-    const int ret = info->indicator(input_size, (TI_REAL const *const *)inputs, options, outputs);
-    lok(ret == TI_OKAY);
+    const clock_t ts_start = clock();
+    const int ret = info->indicator(input_size, (const double * const*)inputs, options, outputs);
+    const clock_t ts_end = clock();
+
+    if (ret != TI_OKAY) {
+        printf("return code %i\n", ret);
+        failed_cnt += 1;
+        any_failures_here = 1;
+        goto cleanup;
+    }
 
     int output_size = input_size - info->start(options);
     if (output_size < 0) output_size = 0;
     for (i = 0; i < info->outputs; ++i) {
-        compare_arrays(answers[i], outputs[i], answer_size, output_size);
+        if (!equal_arrays(answers[i], outputs[i], answer_size, output_size)) {
+            failed_cnt += 1;
+            any_failures_here = 1;
+            printf("output '%s' mismatch\n", info->output_names[i]);
+            printf("> expected: "); print_array(answers[i], answer_size); printf("\n");
+            printf("> got:      "); print_array(outputs[i], output_size); printf("\n");
+        }
     }
 
-    for (i = 0; i < info->inputs; ++i) free(inputs[i]);
-    for (i = 0; i < info->outputs; ++i) free(answers[i]);
-    for (i = 0; i < info->outputs; ++i) free(outputs[i]);
-
+cleanup:
+    for (i = 0; i < info->inputs; ++i) { if (inputs[i]) { free(inputs[i]); } };
+    for (i = 0; i < info->outputs; ++i) { if (answers[i]) { free(answers[i]); } };
+    for (i = 0; i < info->outputs; ++i) { if (outputs[i]) { free(outputs[i]); } };
+    if (!any_failures_here) {
+        printf("%4dμs\n", (int)((ts_end - ts_start) / (double)CLOCKS_PER_SEC * 1000000.0));
+    }
 }
 
-
-void test(const char *fname, int count) {
-    /*Read in test values from external file.*/
-    printf("%s:\n", fname);
+void run_tests(const char *fname) {
+    printf("# test suite %s:\n", fname);
     FILE *fp = fopen(fname, "r");
     if (!fp) {
-        lok(0);
-        return;
+        printf("failed to open\n");
+        exit(PARSING_ERROR);
     }
 
-    char *line;
-
-    while ((line = next_line(fp))) {
-
-        /*Looking for function name.*/
-        if (line[0] < 'a' || line[0] > 'z') {
-            lok(0);
-            continue;
-        }
-
-        /*Found function*/
-        char *name = strtok(line, " \n\r");
-        lrun(name, test_ind_name(fp, name, count));
+    while (!feof(fp)) {
+        run_one(fp);
     }
 
+    printf("\n");
     fclose(fp);
 }
-
-
-void test_version() {
-    lok(strcmp(TI_VERSION, ti_version()) == 0);
-    lok(TI_BUILD == ti_build());
-}
-
 
 void test_buffer() {
     ti_buffer *b = ti_buffer_new(3);
@@ -201,36 +213,33 @@ void test_buffer() {
     lfequal(ti_buffer_get(b, -2), 1.0);
     lfequal(ti_buffer_get(b, -3), 3.0);
 
-
     ti_buffer_free(b);
 }
 
-
 int main() {
+    if (strcmp(TI_VERSION, ti_version()) != 0) {
+        printf("library version mismatch: header %s, binary %s\n", TI_VERSION, ti_version());
+        exit(VERSION_MISMATCH);
+    }
+    if (TI_BUILD != ti_build()) {
+        printf("build version mismatch, header %i, binary %i\n", TI_BUILD, ti_build());
+        exit(VERSION_MISMATCH);
+    }
 
-    printf("TI TEST SUITE\n");
-    lrun("buffer", test_buffer());
-    lrun("version", test_version());
-    test("tests/untest.txt", 0);
-    test("tests/atoz.txt", 1);
-    test("tests/extra.txt", 1);
-
+    run_tests("tests/untest.txt");
+    run_tests("tests/atoz.txt");
+    run_tests("tests/extra.txt");
 
     int i;
     for (i = 0; i < TI_INDICATOR_COUNT; ++i) {
-        if (!tested[i]) {
-            printf("WARNING: no test for %s\n", ti_indicators[i].name);
-        }
+        if (!tested[i]) { printf("WARNING: no test for %s\n", ti_indicators[i].name); }
     }
 
-
-
-    if (lfails == 0) {
-        printf("ALL TESTS PASSED (%d/%d)\n", ltests, ltests);
+    if (failed_cnt == 0) {
+        printf("ALL TESTS PASSED\n");
     } else {
-        printf("%d TESTS FAILED (of %d)\n", lfails, ltests);
+        printf(" %d TEST%s FAILED\n", failed_cnt, failed_cnt > 1 ? "s" : "");
     }
 
-    return lfails != 0;
+    return failed_cnt ? FAILURES_OCCURED : OK;
 }
-
