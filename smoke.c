@@ -23,6 +23,7 @@
 
 #include "indicators.h"
 #include "utils/buffer.h"
+#include "utils/maxheap.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -245,6 +246,34 @@ void test_buffer() {
     printf("%4dμs\n", (int)((ts_end - ts_start) / (double)CLOCKS_PER_SEC * 1000000.0));
 }
 
+void test_maxheap() {
+    printf("running \t%-16s... ", "maxheap");
+    const TI_REAL input[] = {3,4,5,3,2,1,4,5,3,2,10,14,123,-3,5,-41,0,-41};
+    TI_REAL output[] = {123,14,10,5,5,5,4,4,3,3,3,2,2,1,0,-3,-41,-41};
+    TI_REAL answers[sizeof(input)/sizeof(input[0])] = {0};
+    TI_REAL internal[sizeof(input)/sizeof(input[0])] = {0};
+    int size = sizeof(input)/sizeof(input[0]);
+
+    int i;
+
+    clock_t ts_start = clock();
+    for (i = 0; i < size; ++i) {
+        ti_maxheap_push(internal, i, input[i]);
+    }
+    for (i = 0; i < size; ++i) {
+        ti_maxheap_pop(internal, size-i, answers[i]);
+    }
+    clock_t ts_end = clock();
+
+    if (!equal_arrays(output, answers, size, size)) {
+        printf("output mismatch:\n");
+        printf("> expected: "); print_array(output, size); printf("\n");
+        printf("> got:      "); print_array(answers, size); printf("\n");
+        exit(FAILURES_OCCURED);
+    }
+    printf("%4dμs\n", (int)((ts_end - ts_start) / (double)CLOCKS_PER_SEC * 1000000.0));
+}
+
 /************** ENTRY POINT ***************/
 
 int main(int argc, const char** argv) {
@@ -259,6 +288,7 @@ int main(int argc, const char** argv) {
 
     printf("# utils:\n");
     test_buffer();
+    test_maxheap();
     printf("\n");
 
     const char* target_name = argc > 1 ? argv[1] : 0;
