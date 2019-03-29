@@ -4,6 +4,8 @@
 #include <time.h>
 #include <math.h>
 
+/* compile with gcc -DNDEBUG -O2 bench_stateful.c libindicators.a */
+
 #include "indicators.h"
 #include "indicators/truerange.h"
 
@@ -15,12 +17,11 @@ const TI_REAL low[] = {14.3214, 14.3671, 14.5357, 15.0553, 14.8371, 15.3686, 15.
 
 /* An indicator made stateful */
 struct TI_ATR_State {
-	TI_REAL val;
-	TI_REAL previous_close;
+    TI_REAL val;
 };
 
 int ti_atr_state_size(TI_REAL const *options) {
-	return sizeof(struct TI_ATR_State);
+    return sizeof(struct TI_ATR_State);
 }
 
 /* The code was copy-pasted from the lib and only slightly modified */
@@ -29,157 +30,145 @@ int ti_atr_stateful(int size, TI_REAL const *const *inputs, TI_REAL const *optio
     const TI_REAL *low = inputs[1];
     const TI_REAL *close = inputs[2];
 
-    struct TI_ATR_State *state = (struct TI_ATR_State*)pstate;
-
     const int period = (int)options[0];
 
     TI_REAL *output = outputs[0];
 
     if (period < 1) return TI_INVALID_OPTION;
-    if (!state_initalized && size <= ti_atr_start(options)) return TI_OKAY;
 
+    const TI_REAL per = 1.0 / ((TI_REAL)period);
+    int i = 1;
 
-
-	int i = 0;
-	const TI_REAL per = 1.0 / ((TI_REAL)period);
-	TI_REAL truerange;
-
+    TI_REAL val;
+    TI_REAL truerange;
     if (!state_initalized) {
-	    TI_REAL sum = 0;
-	    sum += high[0] - low[0];
-	    for (i = 1; i < period; ++i) {
-	        CALC_TRUERANGE();
-	        sum += truerange;
-	    }
-	    state->val = sum / period;
-	    *output++ = state->val;
+        TI_REAL sum = 0;
 
-	    state->previous_close = close[i];
-	}
+        sum += high[0] - low[0];
+        for (i = 1; i < period; ++i) {
+            CALC_TRUERANGE();
+            sum += truerange;
+        }
 
-	#undef CALC_TRUERANGE
-	#define CALC_TRUERANGE() do{\
-        const TI_REAL l = low[i];\
-        const TI_REAL h = high[i];\
-        const TI_REAL c = state->previous_close;\
-        const TI_REAL ych = fabs(h - c);\
-        const TI_REAL ycl = fabs(l - c);\
-        TI_REAL v = h - l;\
-        if (ych > v) v = ych;\
-        if (ycl > v) v = ycl;\
-        truerange = v;\
-	}while(0)
+
+        TI_REAL val = sum / period;
+        *output++ = val;
+    } else {
+        val = ((struct TI_ATR_State*)pstate)->val;
+    }
 
     for (i; i < size; ++i) {
         CALC_TRUERANGE();
-        state->val = (truerange-state->val) * per + state->val;
-        *output++ = state->val;
-        state->previous_close = close[i];
+        val = (truerange-val) * per + val;
+        *output++ = val;
     }
 
-
-    assert(output - outputs[0] == size - !state_initalized * ti_atr_start(options));
+    ((struct TI_ATR_State*)pstate)->val = val;
+    assert(output - outputs[0] == size - (state_initalized ? 1 : ti_atr_start(options)));
     return TI_OKAY;
 }
 
 
 int main(int argc, char** argv) {
-	const int N = argc-1 ? atoi(argv[1]) : 10000;
-	printf("N = %i\n", N);
+    const int N = argc-1 ? atoi(argv[1]) : 10000;
+    printf("N = %i\n", N);
 
-	const double *inputs[] = {high, low, close};
-	#define SIZE (sizeof(high) / sizeof(high[0]))
-	double options[] = {8};
-	int outsize = SIZE - ti_atr_start(options);
-	double *output = malloc(sizeof(TI_REAL) * outsize);
-	double *outputs[] = {output};
+    const double *inputs[] = {high, low, close};
+    #define SIZE (sizeof(high) / sizeof(high[0]))
+    double options[] = {8};
+    int outsize = SIZE - ti_atr_start(options);
+    double *output = malloc(sizeof(TI_REAL) * outsize);
+    double *outputs[] = {output};
 
-	long long int case1_elapsed = 0;
-	long long int case2_elapsed = 0;
-	long long int case3_elapsed = 0;
-	long long int case4_elapsed = 0;
-	clock_t ts;
+    printf("SIZE = %i\n", SIZE);
 
-	ti_atr(SIZE, inputs, options, outputs);
+    long long int case1_elapsed = 0;
+    long long int case2_elapsed = 0;
+    long long int case3_elapsed = 0;
+    long long int case4_elapsed = 0;
+    clock_t ts;
 
-	const double baseline_last_output = output[SIZE-1-ti_atr_start(options)];
+    ti_atr(SIZE, inputs, options, outputs);
 
-	int necessary_len;
-	for (necessary_len = 1; 1; necessary_len += 1) {
-		int offset = SIZE - necessary_len;
-		const double *other_inputs[] = {high + offset, low + offset, close + offset};
+    const double baseline_last_output = output[SIZE-1-ti_atr_start(options)];
 
-		int another_outsize = necessary_len - ti_atr_start(options);
-		if (another_outsize <= 0) { continue; }
-		double *another_output = malloc(sizeof(TI_REAL) * another_outsize);
-		double *other_outputs[] = {another_output};
-		ti_atr(necessary_len, other_inputs, options, other_outputs);
+    printf("accuracy = 1e-3\n");
+    int necessary_len;
+    for (necessary_len = 1; 1; necessary_len += 1) {
+        int offset = SIZE - necessary_len;
+        const double *other_inputs[] = {high + offset, low + offset, close + offset};
 
-		if (fabs(another_output[another_outsize-1] - output[outsize-1]) <= 1e-3) {
-			free(another_output);
-			break;
-		}
+        int another_outsize = necessary_len - ti_atr_start(options);
+        if (another_outsize <= 0) { continue; }
+        double *another_output = malloc(sizeof(TI_REAL) * another_outsize);
+        double *other_outputs[] = {another_output};
+        ti_atr(necessary_len, other_inputs, options, other_outputs);
 
-		free(another_output);
-	}
-	printf("necessary_len = %i\n", necessary_len);
+        if (fabs(another_output[another_outsize-1] - output[outsize-1]) <= 1e-3) {
+            free(another_output);
+            break;
+        }
 
-	fflush(stdout);
+        free(another_output);
+    }
+    printf("necessary_len = %i\n", necessary_len);
 
-	void* pstate = malloc(ti_atr_state_size(options));
-	for (int _i = 0; _i < N; ++_i) {
-		/* Case 1: The Baseline
-		 * Batch processing that the lib currently provides.
-		 */
-		time_t case1_start_ts = clock();
-		ti_atr(SIZE, inputs, options, outputs);
-		time_t case1_end_ts = clock();
-		case1_elapsed += case1_end_ts - case1_start_ts;
+    fflush(stdout);
 
-		/* Case 2: Stateful
-		 * The same batch processing as before but now you can also keep state.
-		 */
-		double case2_output;
-		double *case2_outputs[] = {&case2_output};
+    void* pstate = malloc(ti_atr_state_size(options));
+    for (int _i = 0; _i < N; ++_i) {
+        /* Case 1: The Baseline
+         * Batch processing that the lib currently provides.
+         */
+        time_t case1_start_ts = clock();
+        ti_atr(SIZE, inputs, options, outputs);
+        time_t case1_end_ts = clock();
+        case1_elapsed += case1_end_ts - case1_start_ts;
 
-		clock_t case2_start_ts = clock();
-		ti_atr_stateful(ti_atr_start(options) + 1, inputs, options, case2_outputs, pstate, 0);
+        /* Case 2: Stateful
+         * The same batch processing as before but now you can also keep state.
+         */
+        double case2_output;
+        double *case2_outputs[] = {&case2_output};
 
-		for (int i = ti_atr_start(options); i < SIZE; ++i) {
-			const double *inputs[] = {high + i, low + i, close + i};
-			ti_atr_stateful(1, inputs, options, case2_outputs, pstate, 1);
-		}
-		clock_t case2_end_ts = clock();
-		case2_elapsed += case2_end_ts - case2_start_ts;
-		assert(baseline_last_output == case2_output);
+        clock_t case2_start_ts = clock();
+        ti_atr_stateful(ti_atr_start(options) + 1, inputs, options, case2_outputs, pstate, 0);
 
-
-		/* Case 3: Slowdown
-		 * Achieve the same accuracy as with the stateful version but for
-		 * a higher price, feeding in loads of data over and over.
-		 */
-		clock_t case3_start_ts = clock();
-		for (int i = 0; i < SIZE-necessary_len+1; ++i) {
-			const double *inputs[] = {high + i, low + i, close + i};
-			ti_atr(necessary_len, inputs, options, outputs);
-		}
-		clock_t case3_end_ts = clock();
-		case3_elapsed += case3_end_ts - case3_start_ts;
-		assert(baseline_last_output == output[SIZE-1-ti_atr_start(options)]);
+        for (int i = ti_atr_start(options); i < SIZE-1; ++i) {
+            const double *inputs[] = {high + i, low + i, close + i};
+            ti_atr_stateful(2, inputs, options, case2_outputs, pstate, 1);
+        }
+        clock_t case2_end_ts = clock();
+        case2_elapsed += case2_end_ts - case2_start_ts;
+        assert(baseline_last_output == case2_output);
 
 
-		/* Case 4: You Only Pay For What You Use
-		 * Easily reproducing the baseline when not using the state.
-		 */
-		clock_t case4_start_ts = clock();
-		ti_atr_stateful(SIZE, inputs, options, outputs, pstate, 0);
-		clock_t case4_end_ts = clock();
-		case4_elapsed += case4_end_ts - case4_start_ts;
-		assert(baseline_last_output == output[SIZE-1-ti_atr_start(options)]);
-	}
+        /* Case 3: Slowdown
+         * Achieve the same accuracy as with the stateful version but for
+         * a higher price, feeding in loads of data over and over.
+         */
+        clock_t case3_start_ts = clock();
+        for (int i = 0; i < SIZE-necessary_len+1; ++i) {
+            const double *inputs[] = {high + i, low + i, close + i};
+            ti_atr(necessary_len, inputs, options, outputs);
+        }
+        clock_t case3_end_ts = clock();
+        case3_elapsed += case3_end_ts - case3_start_ts;
+        assert(baseline_last_output == output[SIZE-1-ti_atr_start(options)]);
 
-	printf("case 1: %5.f ms\n", case1_elapsed * 1000. / CLOCKS_PER_SEC);
-	printf("case 2: %5.f ms\n", case2_elapsed * 1000. / CLOCKS_PER_SEC);
-	printf("case 3: %5.f ms\n", case3_elapsed * 1000. / CLOCKS_PER_SEC);
-	printf("case 4: %5.f ms\n", case4_elapsed * 1000. / CLOCKS_PER_SEC);
+
+        /* Case 4: You Only Pay For What You Use
+         * It's easy to reproduce the baseline when not using the state.
+         */
+        clock_t case4_start_ts = clock();
+        ti_atr_stateful(SIZE, inputs, options, outputs, pstate, 0);
+        clock_t case4_end_ts = clock();
+        case4_elapsed += case4_end_ts - case4_start_ts;
+        assert(baseline_last_output == output[SIZE-1-ti_atr_start(options)]);
+    }
+
+    printf("case 1: %5.f ms\n", case1_elapsed * 1000. / CLOCKS_PER_SEC);
+    printf("case 2: %5.f ms\n", case2_elapsed * 1000. / CLOCKS_PER_SEC);
+    printf("case 3: %5.f ms\n", case3_elapsed * 1000. / CLOCKS_PER_SEC);
+    printf("case 4: %5.f ms\n", case4_elapsed * 1000. / CLOCKS_PER_SEC);
 }
