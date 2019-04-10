@@ -2,7 +2,7 @@ CC ?= gcc
 AR ?= ar
 RANLIB ?= ranlib
 
-CCFLAGS ?= -Wall -Wextra -Wshadow -Wconversion -std=c99 -pedantic -O2 -g
+CCFLAGS ?= -Wall -Wextra -Wshadow -Wconversion -std=c99 -pedantic -O2 -g -fpic
 
 SRCS=$(wildcard indicators/*.c)
 SRCS+=$(wildcard utils/*.c)
@@ -20,6 +20,10 @@ libindicators.a: indicators.h $(OBJS)
 	$(CC) -c $(CCFLAGS) indicators_index.c -o indicators_index.o
 	$(AR) rcu $@ $^ indicators_index.o
 	$(RANLIB) $@
+
+libindicators.so: indicators.h $(OBJS)
+	$(CC) -c $(CCFLAGS) indicators_index.c -o indicators_index.o
+	$(CC) -shared -o $@ $^ indicators_index.o
 
 smoke: smoke.o libindicators.a
 	$(CC) $(CCFLAGS) -o $@ $^ -lm
